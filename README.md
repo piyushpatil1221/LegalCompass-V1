@@ -4,6 +4,8 @@ A citizen-facing legal assistant built on the **LegalCompass IPC↔BNS mapping**
 
 A user describes an incident in plain words; the app asks follow-up questions, decides **which legal code applies by date** (pre-reform IPC/CrPC or post-reform BNS/BNSS), lists **applicable sections with their old↔new counterparts**, shows **similar past cases**, suggests actionable **next steps** (FIR, escalation, helplines, free legal aid), and produces a **masked summary for a lawyer** with personal details redacted.
 
+> **Live demo:** https://legal-compass-v1.vercel.app · **Public API:** https://legalcompass-backend.onrender.com (see [API Access](#api-access))
+
 > **Disclaimer:** General legal information, not legal advice. Displayed prominently across every screen.
 
 > 💡 **Setting this up on your machine or collaborating?** See the step-by-step **[Collaborator & Setup Guide](COLLABORATOR_SETUP_GUIDE.md)** for a beginner-friendly walkthrough with copy-paste commands and troubleshooting.
@@ -183,11 +185,13 @@ LegalCompass has **one fixed, shared public API key**. Anyone can use it to call
 | | |
 |---|---|
 | **API key** | `lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY` |
-| **Base URL** | `http://localhost:8100` (local backend; via the website use `http://localhost:3000`). *Production URL: added after deployment.* |
+| **Base URL** | `https://legalcompass-backend.onrender.com` (production) · `http://localhost:8100` when running locally |
+| **Website** | https://legal-compass-v1.vercel.app (API page: https://legal-compass-v1.vercel.app/api-access) |
 | **Header** | `x-api-key: <API key>` |
 | **Fallback** | `?api_key=<API key>` query parameter |
 | **Errors** | Missing/wrong key → `401 {"detail": "...", "code": "missing_api_key" \| "invalid_api_key"}`; too many requests → `429` |
 | **Rate limit** | 120 requests/min per IP overall; analysis 40/min, uploads and complaint drafts 12/min, lookups 90/min |
+| **Cold start** | The free Render server sleeps after ~15 min idle; the first request may take up to a minute |
 | **Open endpoints** | `GET /health` and the interactive docs at `/docs` need no key (click **Authorize** in `/docs` to try calls) |
 
 > This key only unlocks the LegalCompass API. Third-party secrets (e.g. an LLM key) stay on the server and are never sent to the browser. General legal information, not legal advice.
@@ -196,18 +200,18 @@ The examples below assume:
 
 ```bash
 # bash
-BASE=http://localhost:8100
+BASE=https://legalcompass-backend.onrender.com     # or http://localhost:8100 locally
 KEY=lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY
 ```
 ```python
 # Python (pip install requests). On Windows, run with  python -X utf8  so ₹ and Hindi/Marathi text print correctly.
 import requests
-BASE = "http://localhost:8100"
+BASE = "https://legalcompass-backend.onrender.com"  # or "http://localhost:8100" locally
 H = {"x-api-key": "lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY"}
 ```
 ```javascript
 // JavaScript (browser or Node 18+)
-const BASE = "http://localhost:8100";
+const BASE = "https://legalcompass-backend.onrender.com"; // or "http://localhost:8100" locally
 const H = { "x-api-key": "lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY" };
 ```
 
