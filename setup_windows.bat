@@ -22,7 +22,10 @@ if exist "%APP%mapping_api\src\sb_api\main.py" (
 REM Setup Python virtual environment
 set "VENV=%APP%.venv"
 if not exist "%VENV%\Scripts\activate.bat" (
-  if exist "%APP%..\sanhita-bridge\.venv\Scripts\activate.bat" (
+  if exist "%APP%mapping_api\.venv\Scripts\activate.bat" (
+    set "VENV=%APP%mapping_api\.venv"
+    echo [*] Using existing virtual environment in "%VENV%"
+  ) else if exist "%APP%..\sanhita-bridge\.venv\Scripts\activate.bat" (
     set "VENV=%APP%..\sanhita-bridge\.venv"
     echo [*] Using existing virtual environment in "%VENV%"
   ) else (

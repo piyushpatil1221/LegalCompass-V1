@@ -16,6 +16,8 @@ if exist "%APP%mapping_api\src\sb_api\main.py" (
 REM Detect virtual environment
 if exist "%APP%.venv\Scripts\activate.bat" (
   set "VENV=%APP%.venv\Scripts\activate.bat"
+) else if exist "%APP%mapping_api\.venv\Scripts\activate.bat" (
+  set "VENV=%APP%mapping_api\.venv\Scripts\activate.bat"
 ) else if exist "%APP%..\sanhita-bridge\.venv\Scripts\activate.bat" (
   set "VENV=%APP%..\sanhita-bridge\.venv\Scripts\activate.bat"
 ) else (
