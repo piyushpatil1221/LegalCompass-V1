@@ -1,0 +1,8 @@
+# Keep binary fixtures byte-exact and shell scripts LF (they run inside Linux containers)
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.png binary
+*.gz binary
+*.wasm binary
+*.sh text eol=lf
