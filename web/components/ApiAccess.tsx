@@ -146,7 +146,7 @@ function TryIt({ base }: { base: string }) {
   const [query, setQuery] = useState(ep.query ?? "");
   const [body, setBody] = useState(ep.body ? JSON.stringify(ep.body, null, 2) : "");
   const [file, setFile] = useState<File | null>(null);
-  const [sendKey, setSendKey] = useState(true);
+  const [key, setKey] = useState(API_KEY);
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<Result | null>(null);
   const [err, setErr] = useState("");
@@ -159,7 +159,7 @@ function TryIt({ base }: { base: string }) {
   const send = async () => {
     setErr(""); setRes(null);
     let payload: BodyInit | undefined;
-    const headers: Record<string, string> = sendKey && !ep.open ? { "x-api-key": API_KEY } : {};
+    const headers: Record<string, string> = key.trim() && !ep.open ? { "x-api-key": key.trim() } : {};
     if (ep.body) {
       try { payload = JSON.stringify(JSON.parse(body)); } catch { setErr("The request body is not valid JSON."); return; }
       headers["Content-Type"] = "application/json";
@@ -189,10 +189,21 @@ function TryIt({ base }: { base: string }) {
   return (
     <section aria-labelledby="try-h" className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-ink/5 sm:p-6">
       <h2 id="try-h" className="font-display text-2xl text-ink">Try it</h2>
-      <p className="mt-1 text-sm text-slate">Call an endpoint from your browser and see the JSON response. Untick “Send API key” to see the 401 error.</p>
+      <p className="mt-1 text-sm text-slate">Paste an API key, call an endpoint from your browser and see the JSON response. Clear the key or paste a wrong one to see the 401 error.</p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="space-y-3">
+          <label className="block">
+            <span className="text-sm font-semibold text-ink">API key <span className="font-normal text-slate">(sent as x-api-key)</span></span>
+            <div className="mt-1 flex gap-2">
+              <input value={key} onChange={(e) => setKey(e.target.value)} placeholder="Paste your API key" spellCheck={false} autoComplete="off"
+                className="min-w-0 flex-1 rounded-lg border border-ink/15 bg-white px-3 py-2 font-mono text-sm text-ink placeholder:text-slate/60 focus:border-sky focus:outline-none" />
+              {key !== API_KEY && (
+                <button type="button" onClick={() => setKey(API_KEY)}
+                  className="shrink-0 rounded-lg bg-mist px-3 py-2 text-xs font-semibold text-ink-2 hover:bg-sky hover:text-white">Reset</button>
+              )}
+            </div>
+          </label>
           <label className="block">
             <span className="text-sm font-semibold text-ink">Endpoint</span>
             <select value={id} onChange={(e) => pick(e.target.value)}
@@ -223,12 +234,7 @@ function TryIt({ base }: { base: string }) {
             </label>
           )}
           <div className="flex flex-wrap items-center gap-4">
-            {!ep.open && (
-              <label className="inline-flex items-center gap-2 text-sm text-ink">
-                <input type="checkbox" checked={sendKey} onChange={(e) => setSendKey(e.target.checked)} className="h-4 w-4 accent-[#14213d]" />
-                Send API key
-              </label>
-            )}
+            {ep.open && <span className="text-xs text-slate">This endpoint needs no key.</span>}
             <button type="button" onClick={send} disabled={busy}
               className="ml-auto rounded-lg bg-ink px-5 py-2 text-sm font-semibold text-white hover:bg-ink-2 disabled:opacity-50">
               {busy ? "Sending…" : "Send request"}
