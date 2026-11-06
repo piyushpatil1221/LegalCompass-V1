@@ -157,6 +157,7 @@ export default function Home() {
             <button type="button" onClick={() => setTool("converter")} className={navBtn}>{t.nav_converter}</button>
             <button type="button" onClick={() => setTool("date")} className={navBtn}>{t.nav_date}</button>
             <button type="button" onClick={() => setTool("glossary")} className={navBtn}>{t.nav_help}</button>
+            <a href="/api-access" className={navBtn}>API Access</a>
           </nav>
           <div className="ml-auto flex items-center gap-2 print:hidden">
             <div role="group" aria-label="Language" className="inline-flex rounded-lg bg-mist p-0.5">
@@ -177,6 +178,7 @@ export default function Home() {
           <button type="button" onClick={() => setTool("converter")} className={navBtn}>{t.nav_converter}</button>
           <button type="button" onClick={() => setTool("date")} className={navBtn}>{t.nav_date}</button>
           <button type="button" onClick={() => setTool("glossary")} className={navBtn}>{t.nav_help}</button>
+          <a href="/api-access" className={navBtn}>API Access</a>
           <a href="tel:112" className="whitespace-nowrap rounded-lg bg-[#c0392b] px-3 py-2 text-sm font-bold text-white">{t.emergency}</a>
         </nav>
       </header>
