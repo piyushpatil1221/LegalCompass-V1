@@ -7,12 +7,16 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
     envVars:
+      # The shared public API key. Paste the SAME value as NEXT_PUBLIC_LEGALCOMPASS_API_KEY on Vercel.
       - key: LEGALCOMPASS_API_KEY
-        generateValue: true
+        sync: false
       - key: CORS_ORIGIN_REGEX
         value: https://.*\.vercel\.app
       - key: CORS_ORIGINS
         value: http://localhost:3000
+      # Render sits behind Cloudflare, which sets this to the real visitor IP (used for per-IP rate limits)
+      - key: CLIENT_IP_HEADER
+        value: cf-connecting-ip
       - key: SERVER_OCR
         value: "0"
       # optional: paste your xAI Grok ("xai-...") or Groq ("gsk_...") key in the Render dashboard

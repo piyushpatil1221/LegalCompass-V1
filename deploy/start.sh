@@ -3,7 +3,10 @@
 set -e
 ROOT="${APP_ROOT:-/srv}"
 MAPPING_PORT="${MAPPING_PORT:-8000}"
-: "${LEGALCOMPASS_API_KEY:=internal-$(date +%s)}"
+if [ -z "$LEGALCOMPASS_API_KEY" ]; then
+  echo "ERROR: set LEGALCOMPASS_API_KEY (the shared public API key; same value as NEXT_PUBLIC_LEGALCOMPASS_API_KEY on Vercel)" >&2
+  exit 1
+fi
 export LEGALCOMPASS_API_KEY SB_API_KEYS="$LEGALCOMPASS_API_KEY" SB_RATE_KEY=100000 PYTHONUTF8=1
 export LEGALCOMPASS_API="http://127.0.0.1:${MAPPING_PORT}"
 

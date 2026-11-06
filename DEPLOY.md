@@ -29,20 +29,38 @@ Browser ──▶ Vercel (website, OCR in the browser)
 
 ## 2. Backend on Render
 1. On render.com: **New → Blueprint** → connect GitHub → pick `legalcompass-app`.
-2. Render reads `render.yaml` and creates **legalcompass-backend** (Docker, free plan). Click **Apply**.
+2. Render reads `render.yaml` and creates **legalcompass-backend** (Docker, free plan). It asks for the values marked
+   `sync: false`:
+   - `LEGALCOMPASS_API_KEY` = the shared public API key (the `lc_...` value from `backend/.env`; create one with
+     `python deploy/make_local_env.py`). **Required** — the service refuses to start without it.
+   - `LLM_API_KEY` = leave empty unless you have an xAI/Groq key.
+
+   Click **Apply**.
 3. The first build takes 5–10 minutes. When it says *Live*, copy its URL, e.g.
    `https://legalcompass-backend.onrender.com`.
-4. Check it: open `https://legalcompass-backend.onrender.com/api/status` — you should see `"legalcompass_api": true`.
+4. Check it: open `https://legalcompass-backend.onrender.com/health` — you should see `{"ok":true}`. Then
+   `https://legalcompass-backend.onrender.com/api/status?api_key=<your key>` should show `"legalcompass_api": true`
+   (without the key you get a 401 — that is correct).
 
 ## 3. Website on Vercel
 1. On vercel.com: **Add New → Project** → import `legalcompass-app`.
 2. **Root Directory:** click *Edit* and choose `web`. Framework is detected as Next.js.
 3. **Environment Variables:** add
-   `NEXT_PUBLIC_API_BASE` = your Render URL from step 2 (no trailing slash).
+   - `NEXT_PUBLIC_API_BASE` = your Render URL from step 2 (no trailing slash).
+   - `NEXT_PUBLIC_LEGALCOMPASS_API_KEY` = **the same key** as `LEGALCOMPASS_API_KEY` on Render.
+
+   Both are built into the website, so after changing either one click **Redeploy** on Vercel.
 4. Click **Deploy**. You get a link like `https://legalcompass-app.vercel.app` — that is your demo.
 
 The backend already allows any `*.vercel.app` address (see `CORS_ORIGIN_REGEX` in `render.yaml`). If you later use
 your own domain, add it in Render → Environment → `CORS_ORIGINS` (comma-separated).
+
+## Getting found on Google (optional)
+The site serves `/robots.txt` and `/sitemap.xml` automatically. In
+[Google Search Console](https://search.google.com/search-console) add your Vercel URL as a *URL-prefix* property,
+verify it (HTML tag method: paste the tag's `content` value into Vercel env `NEXT_PUBLIC_GOOGLE_VERIFICATION`, or use
+the HTML-file method), then submit `sitemap.xml` and use *URL inspection → Request indexing*. New sites usually appear
+within a few days.
 
 ## On demo day
 - **Free Render services sleep after ~15 minutes without visitors.** The first request then takes up to a minute;
@@ -67,5 +85,7 @@ Push to GitHub (`git add . ; git commit -m "update" ; git push`). Render and Ver
 | Website shows "server is busy" for a long time | Open the Render URL `/api/status` directly; check Render → Logs |
 | Browser console shows a CORS error | Add your exact website address to Render → Environment → `CORS_ORIGINS` and redeploy |
 | `/api/status` shows `"legalcompass_api": false` | Render → Logs: the mapping API failed to start (look for an error above "mapping API ready") |
+| Website or API returns **401** | `LEGALCOMPASS_API_KEY` (Render) and `NEXT_PUBLIC_LEGALCOMPASS_API_KEY` (Vercel) must be identical; redeploy Vercel after changing it |
+| Render deploy fails with "set LEGALCOMPASS_API_KEY" | Add it in Render → Environment |
 | Uploads say "Too many requests" | Wait a minute, or raise `RATE_DOC` in Render → Environment |
 | Vercel build fails at "copy-ocr-assets" | Make sure Root Directory is `web` and `package-lock.json` is committed |
