@@ -56,3 +56,16 @@ def test_date_checker_and_editable_facts():
     r2 = c.post("/api/analyze", json={"narrative": "On 12 March 2025 in Pune I lost Rs 45,000 through a fake UPI call.",
                                       "answers": {"offence_date": "2024-03-12"}, "finalize": True}).json()
     assert r2["regime"]["law"] == "IPC"
+
+
+def test_rate_limit_ignores_forged_forwarded_for(monkeypatch):
+    from app import main
+    monkeypatch.setitem(main.LIMITS, "api", 2)
+    main._hits.clear()
+    codes = [c.get("/api/status", headers={"x-forwarded-for": f"10.0.0.{i}"}).status_code for i in range(3)]
+    assert codes == [200, 200, 429]  # a new fake address per call does not reset the limit
+    main._hits.clear()
+    monkeypatch.setattr(main, "CLIENT_IP_HEADER", "cf-connecting-ip")
+    codes = [c.get("/api/status", headers={"cf-connecting-ip": ip}).status_code for ip in ("1.1.1.1", "1.1.1.1", "2.2.2.2")]
+    assert codes == [200, 200, 200]  # the trusted proxy header separates real visitors
+    main._hits.clear()

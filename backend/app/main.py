@@ -31,12 +31,18 @@ LIMITS = {"analyze": int(os.environ.get("RATE_ANALYZE", "40")), "doc": int(os.en
           "api": int(os.environ.get("RATE_API", "120"))}  # all /api/* calls together
 _hits: dict[str, deque] = defaultdict(deque)
 TOO_MANY = "Too many requests — please wait a minute and try again."
+# Header our hosting proxy sets to the real visitor IP, e.g. cf-connecting-ip on Render (Cloudflare overwrites it).
+# X-Forwarded-For is not used: callers can put any address in it and dodge the limits.
+CLIENT_IP_HEADER = os.environ.get("CLIENT_IP_HEADER", "").strip().lower()
+
+
+def _client_ip(request: Request) -> str:
+    return ((CLIENT_IP_HEADER and request.headers.get(CLIENT_IP_HEADER, "").strip())
+            or (request.client.host if request.client else "?"))
 
 
 def _over_limit(bucket: str, request: Request) -> bool:
-    fwd = request.headers.get("x-forwarded-for", "")
-    ip = fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
-    q, now = _hits[f"{bucket}:{ip}"], time.time()
+    q, now = _hits[f"{bucket}:{_client_ip(request)}"], time.time()
     while q and now - q[0] > 60:
         q.popleft()
     if len(q) >= LIMITS[bucket]:
