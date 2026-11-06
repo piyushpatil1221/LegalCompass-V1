@@ -2,10 +2,21 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app import lc_client
+from app import config, lc_client
 from app.main import app
 
-c = TestClient(app)
+c = TestClient(app, headers={"x-api-key": config.LEGALCOMPASS_API_KEY})
+anon = TestClient(app)
+
+
+def test_api_key_required():
+    r = anon.get("/api/status")
+    assert r.status_code == 401 and r.json()["code"] == "missing_api_key"
+    r = anon.get("/api/status", headers={"x-api-key": "wrong"})
+    assert r.status_code == 401 and r.json()["code"] == "invalid_api_key"
+    assert anon.get("/api/status", params={"api_key": config.LEGALCOMPASS_API_KEY}).status_code == 200
+    assert anon.get("/health").json() == {"ok": True}
+    assert anon.get("/openapi.json").status_code == 200
 
 
 def test_status():

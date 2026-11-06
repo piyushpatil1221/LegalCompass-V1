@@ -6,15 +6,17 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import threading
 import time
 from collections import defaultdict, deque
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from pydantic import BaseModel, Field
 
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from . import __version__, cases, classifier, complaint, config, documents, extract, lc_client, llm, pipeline
 from .offences import OFFENCES
@@ -25,21 +27,63 @@ app = FastAPI(title="LegalCompass Assistant API", version=__version__,
                           "steps. Uses the LegalCompass mapping (DOI 10.21227/h4wg-7413). Not legal advice.")
 # ---------------------------------------------------------------- simple per-IP rate limits (public demo)
 LIMITS = {"analyze": int(os.environ.get("RATE_ANALYZE", "40")), "doc": int(os.environ.get("RATE_DOC", "12")),
-          "complaint": int(os.environ.get("RATE_COMPLAINT", "12")), "lookup": int(os.environ.get("RATE_LOOKUP", "90"))}
+          "complaint": int(os.environ.get("RATE_COMPLAINT", "12")), "lookup": int(os.environ.get("RATE_LOOKUP", "90")),
+          "api": int(os.environ.get("RATE_API", "120"))}  # all /api/* calls together
 _hits: dict[str, deque] = defaultdict(deque)
+TOO_MANY = "Too many requests — please wait a minute and try again."
+
+
+def _over_limit(bucket: str, request: Request) -> bool:
+    fwd = request.headers.get("x-forwarded-for", "")
+    ip = fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
+    q, now = _hits[f"{bucket}:{ip}"], time.time()
+    while q and now - q[0] > 60:
+        q.popleft()
+    if len(q) >= LIMITS[bucket]:
+        return True
+    q.append(now)
+    return False
 
 
 def limit(bucket: str):
     def dep(request: Request):
-        fwd = request.headers.get("x-forwarded-for", "")
-        ip = fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
-        q, now = _hits[f"{bucket}:{ip}"], time.time()
-        while q and now - q[0] > 60:
-            q.popleft()
-        if len(q) >= LIMITS[bucket]:
-            raise HTTPException(429, "Too many requests — please wait a minute and try again.")
-        q.append(now)
+        if _over_limit(bucket, request):
+            raise HTTPException(429, TOO_MANY)
     return dep
+
+
+# ---------------------------------------------------------------- shared public API key (one fixed key for everyone)
+@app.middleware("http")
+async def require_api_key(request: Request, call_next):
+    """Every /api/* call needs LEGALCOMPASS_API_KEY in an x-api-key header (or ?api_key=). /health and /docs stay open."""
+    if request.url.path.startswith("/api/") and request.method != "OPTIONS":
+        if _over_limit("api", request):
+            return JSONResponse({"detail": TOO_MANY, "code": "rate_limited"}, 429, headers={"Retry-After": "60"})
+        expected = config.LEGALCOMPASS_API_KEY
+        if not expected:
+            return JSONResponse({"detail": "Server misconfigured: LEGALCOMPASS_API_KEY is not set.", "code": "no_server_key"}, 503)
+        sent = request.headers.get("x-api-key") or request.query_params.get("api_key") or ""
+        if not secrets.compare_digest(sent.encode(), expected.encode()):
+            return JSONResponse({"detail": "Invalid API key." if sent else "Missing API key. Send it in the x-api-key header "
+                                 "(or ?api_key=).", "code": "invalid_api_key" if sent else "missing_api_key"},
+                                401, headers={"WWW-Authenticate": "ApiKey"})
+    return await call_next(request)
+
+
+def _openapi():
+    """Adds the key to /docs so 'Authorize' then 'Try it out' work."""
+    if not app.openapi_schema:
+        s = get_openapi(title=app.title, version=app.version, description=app.description, routes=app.routes)
+        s.setdefault("components", {})["securitySchemes"] = {"ApiKey": {"type": "apiKey", "in": "header", "name": "x-api-key"}}
+        for path, ops in s["paths"].items():
+            if path.startswith("/api/"):
+                for op in ops.values():
+                    op["security"] = [{"ApiKey": []}]
+        app.openapi_schema = s
+    return app.openapi_schema
+
+
+app.openapi = _openapi
 
 
 WARMUP = {"state": "starting", "seconds": None}

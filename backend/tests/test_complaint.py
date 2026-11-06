@@ -5,10 +5,10 @@ import pytest
 from docx import Document
 from fastapi.testclient import TestClient
 
-from app import lc_client
+from app import config, lc_client
 from app.main import app
 
-c = TestClient(app)
+c = TestClient(app, headers={"x-api-key": config.LEGALCOMPASS_API_KEY})
 pytestmark = pytest.mark.skipif(not lc_client.health(), reason="LegalCompass API not running")
 FRAUD = "On 12 March 2025 a caller pretending to be from my bank took my OTP and Rs 45,000 via UPI."
 

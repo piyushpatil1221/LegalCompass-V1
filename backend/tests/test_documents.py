@@ -4,10 +4,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from app import documents, lc_client
+from app import documents, config, lc_client
 from app.main import app
 
-c = TestClient(app)
+c = TestClient(app, headers={"x-api-key": config.LEGALCOMPASS_API_KEY})
 FIX = Path(__file__).parent / "fixtures"
 pytestmark = pytest.mark.skipif(not lc_client.health(), reason="LegalCompass API not running")
 
