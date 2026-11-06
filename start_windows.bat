@@ -25,7 +25,13 @@ if exist "%APP%.venv\Scripts\activate.bat" (
   pause & exit /b 1
 )
 
-set "KEY=dev-local-key"
+REM Shared LegalCompass API key from backend\.env (created by setup_windows.bat)
+set "KEY="
+if exist "%APP%backend\.env" for /f "usebackq tokens=1,* delims==" %%a in ("%APP%backend\.env") do if "%%a"=="LEGALCOMPASS_API_KEY" set "KEY=%%b"
+if not defined KEY (
+  echo [!] LEGALCOMPASS_API_KEY not found in backend\.env. Run setup_windows.bat first.
+  pause & exit /b 1
+)
 REM Make Python read and write text files as UTF-8 on Windows
 set "PYTHONUTF8=1"
 

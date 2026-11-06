@@ -46,6 +46,9 @@ if exist "%MAPPING_DIR%\requirements-api.txt" (
 echo [*] Installing assistant backend dependencies...
 pip install -r "%APP%backend\requirements.txt" || (pause & exit /b 1)
 
+echo [*] Creating the shared LegalCompass API key (kept if it already exists)...
+python "%APP%deploy\make_local_env.py" || (pause & exit /b 1)
+
 echo [*] Installing frontend dependencies...
 cd /d "%APP%web"
 call npm install || (echo [!] npm failed. Install Node.js 20+ & pause & exit /b 1)

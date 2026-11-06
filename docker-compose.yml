@@ -27,6 +27,8 @@ services:
   web:
     build:
       context: ./web
+      args:
+        NEXT_PUBLIC_LEGALCOMPASS_API_KEY: ${LEGALCOMPASS_API_KEY:-dev-local-key}
     environment:
       BACKEND_URL: http://backend:8100
     ports: ["3000:3000"]

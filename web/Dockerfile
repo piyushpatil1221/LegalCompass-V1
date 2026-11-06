@@ -3,7 +3,9 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci || npm install
 COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
+# Public LegalCompass API key, baked into the browser bundle at build time
+ARG NEXT_PUBLIC_LEGALCOMPASS_API_KEY=""
+ENV NEXT_TELEMETRY_DISABLED=1 NEXT_PUBLIC_LEGALCOMPASS_API_KEY=$NEXT_PUBLIC_LEGALCOMPASS_API_KEY
 RUN npm run build
 
 FROM node:22-alpine
