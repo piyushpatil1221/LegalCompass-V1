@@ -96,7 +96,12 @@ Before running the application, make sure you have installed:
 
 ### Option 2: Running via Terminal (Cross-Platform: Windows / macOS / Linux)
 
-Open three terminal windows (or tabs) in the `legalcompass-app` root directory:
+Open three terminal windows (or tabs) in the `legalcompass-app` root directory.
+
+**Once, before the first run**, create the shared API key (writes `backend/.env` and `web/.env.local`, both git-ignored; an existing key is kept):
+```bash
+python deploy/make_local_env.py      # prints LEGALCOMPASS_API_KEY=lc_...
+```
 
 #### Terminal 1: Mapping API (Port 8000)
 ```bash
@@ -114,7 +119,7 @@ source .venv/bin/activate
 pip install -r requirements-api.txt
 
 # Start Mapping API service
-export SB_API_KEYS=dev-local-key    # On Windows PowerShell: $env:SB_API_KEYS="dev-local-key"
+export SB_API_KEYS=<your LEGALCOMPASS_API_KEY>   # On Windows PowerShell: $env:SB_API_KEYS="<your key>"
 export PYTHONPATH=src               # On Windows PowerShell: $env:PYTHONPATH="src"
 uvicorn sb_api.main:app --port 8000 --reload
 ```
@@ -135,7 +140,7 @@ source ../mapping_api/.venv/bin/activate
 pip install -r requirements.txt
 
 # Start backend orchestrator
-export LEGALCOMPASS_API_KEY=dev-local-key   # On Windows PowerShell: $env:LEGALCOMPASS_API_KEY="dev-local-key"
+# LEGALCOMPASS_API_KEY is read from backend/.env automatically
 uvicorn app.main:app --port 8100 --reload
 ```
 *Health check:* Verify by visiting `http://localhost:8100/api/status`.
@@ -171,6 +176,155 @@ Access the frontend at `http://localhost:3000`.
 
 ---
 
+## API Access
+
+LegalCompass has **one fixed, shared public API key**. Anyone can use it to call the API end to end; the website sends it automatically. The same details and a live **Try it** box are on the website at **`/api-access`**.
+
+| | |
+|---|---|
+| **API key** | `lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY` |
+| **Base URL** | `http://localhost:8100` (local backend; via the website use `http://localhost:3000`). *Production URL: added after deployment.* |
+| **Header** | `x-api-key: <API key>` |
+| **Fallback** | `?api_key=<API key>` query parameter |
+| **Errors** | Missing/wrong key → `401 {"detail": "...", "code": "missing_api_key" \| "invalid_api_key"}`; too many requests → `429` |
+| **Rate limit** | 120 requests/min per IP overall; analysis 40/min, uploads and complaint drafts 12/min, lookups 90/min |
+| **Open endpoints** | `GET /health` and the interactive docs at `/docs` need no key (click **Authorize** in `/docs` to try calls) |
+
+> This key only unlocks the LegalCompass API. Third-party secrets (e.g. an LLM key) stay on the server and are never sent to the browser. General legal information, not legal advice.
+
+The examples below assume:
+
+```bash
+# bash
+BASE=http://localhost:8100
+KEY=lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY
+```
+```python
+# Python (pip install requests). On Windows, run with  python -X utf8  so ₹ and Hindi/Marathi text print correctly.
+import requests
+BASE = "http://localhost:8100"
+H = {"x-api-key": "lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY"}
+```
+```javascript
+// JavaScript (browser or Node 18+)
+const BASE = "http://localhost:8100";
+const H = { "x-api-key": "lc_hzmkTDORAaxOy9gEwm6IEuktHKzIS99fFG2swHYSgTY" };
+```
+
+### `GET /api/lookup` — convert a section (IPC↔BNS, CrPC↔BNSS, IEA↔BSA)
+`q` accepts `420`, `IPC 302`, `BNS 103(1)`, `CrPC 154`, `IEA 65B`.
+```bash
+curl -H "x-api-key: $KEY" "$BASE/api/lookup?q=IPC+420"
+```
+```python
+print(requests.get(f"{BASE}/api/lookup", params={"q": "IPC 420"}, headers=H).json())
+```
+```javascript
+console.log(await (await fetch(`${BASE}/api/lookup?q=${encodeURIComponent("IPC 420")}`, { headers: H })).json());
+```
+
+### `GET /api/applicable-law` — which code applies on a date
+```bash
+curl -H "x-api-key: $KEY" "$BASE/api/applicable-law?date=2025-03-12&lang=en"
+```
+```python
+print(requests.get(f"{BASE}/api/applicable-law", params={"date": "2025-03-12", "lang": "en"}, headers=H).json())
+```
+```javascript
+console.log(await (await fetch(`${BASE}/api/applicable-law?date=2025-03-12&lang=en`, { headers: H })).json());
+```
+
+### `POST /api/analyze` — analyse an incident description
+`lang` is `en`, `hi` or `mr`. With `finalize: false` the response contains follow-up `questions`; send the replies back in `answers`.
+```bash
+curl -X POST "$BASE/api/analyze" -H "x-api-key: $KEY" -H "Content-Type: application/json" \
+  -d '{"narrative":"On 12 March 2025 someone called pretending to be from my bank and I lost Rs 45,000 through UPI.","answers":{},"finalize":true,"lang":"en"}'
+```
+```python
+body = {"narrative": "On 12 March 2025 someone called pretending to be from my bank and I lost Rs 45,000 through UPI.",
+        "answers": {}, "finalize": True, "lang": "en"}
+print(requests.post(f"{BASE}/api/analyze", json=body, headers=H).json())
+```
+```javascript
+const body = { narrative: "On 12 March 2025 someone called pretending to be from my bank and I lost Rs 45,000 through UPI.",
+               answers: {}, finalize: true, lang: "en" };
+const r = await fetch(`${BASE}/api/analyze`, { method: "POST", headers: { ...H, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+console.log(await r.json());
+```
+
+### `POST /api/document-text` — convert old citations in text
+```bash
+curl -X POST "$BASE/api/document-text" -H "x-api-key: $KEY" -H "Content-Type: application/json" \
+  -d '{"text":"FIR registered under section 420 IPC and 120B IPC on 3 May 2023 at Pune.","lang":"en"}'
+```
+```python
+body = {"text": "FIR registered under section 420 IPC and 120B IPC on 3 May 2023 at Pune.", "lang": "en"}
+print(requests.post(f"{BASE}/api/document-text", json=body, headers=H).json())
+```
+```javascript
+const r = await fetch(`${BASE}/api/document-text`, { method: "POST", headers: { ...H, "Content-Type": "application/json" },
+  body: JSON.stringify({ text: "FIR registered under section 420 IPC and 120B IPC on 3 May 2023 at Pune.", lang: "en" }) });
+console.log(await r.json());
+```
+
+### `POST /api/document` — upload an FIR / charge-sheet (PDF, DOCX, TXT)
+A scanned file without server OCR returns `422 {"detail": {"code": "needs_ocr"}}`; OCR it yourself and use `/api/document-text`.
+```bash
+curl -X POST "$BASE/api/document?lang=en" -H "x-api-key: $KEY" -F "file=@fir.pdf"
+```
+```python
+with open("fir.pdf", "rb") as f:
+    print(requests.post(f"{BASE}/api/document", params={"lang": "en"}, files={"file": f}, headers=H).json())
+```
+```javascript
+const form = new FormData();
+form.append("file", fileInput.files[0]);            // an <input type="file">; in Node: new Blob([fs.readFileSync("fir.pdf")])
+console.log(await (await fetch(`${BASE}/api/document?lang=en`, { method: "POST", headers: H, body: form })).json());
+```
+
+### `POST /api/complaint` — download a .docx complaint draft
+`kind` is `fir` (police station), `sp` (Superintendent of Police) or `magistrate`.
+```bash
+curl -X POST "$BASE/api/complaint" -H "x-api-key: $KEY" -H "Content-Type: application/json" \
+  -d '{"narrative":"On 12 March 2025 someone called pretending to be from my bank and I lost Rs 45,000 through UPI.","answers":{},"kind":"fir"}' \
+  -o legalcompass-fir-draft.docx
+```
+```python
+body = {"narrative": "On 12 March 2025 someone called pretending to be from my bank and I lost Rs 45,000 through UPI.",
+        "answers": {}, "kind": "fir"}
+r = requests.post(f"{BASE}/api/complaint", json=body, headers=H)
+open("legalcompass-fir-draft.docx", "wb").write(r.content)
+```
+```javascript
+const r = await fetch(`${BASE}/api/complaint`, { method: "POST", headers: { ...H, "Content-Type": "application/json" },
+  body: JSON.stringify({ narrative: "On 12 March 2025 someone called pretending to be from my bank and I lost Rs 45,000 through UPI.", answers: {}, kind: "fir" }) });
+const blob = await r.blob();                        // .docx file
+```
+
+### `GET /api/status` — service status
+```bash
+curl -H "x-api-key: $KEY" "$BASE/api/status"
+```
+```python
+print(requests.get(f"{BASE}/api/status", headers=H).json())
+```
+```javascript
+console.log(await (await fetch(`${BASE}/api/status`, { headers: H })).json());
+```
+
+### `GET /health` — liveness check (no key)
+```bash
+curl "$BASE/health"
+```
+```python
+print(requests.get(f"{BASE}/health").json())
+```
+```javascript
+console.log(await (await fetch(`${BASE}/health`)).json());
+```
+
+---
+
 ## Online Deployment (Vercel + Render)
 
 The project is pre-configured for free cloud deployment:
@@ -188,7 +342,9 @@ Copy `.env.example` to `.env` or set environment variables in your environment:
 | Variable | Default | Purpose |
 |---|---|---|
 | `LEGALCOMPASS_API` | `http://127.0.0.1:8000` | URL of the LegalCompass transition API |
-| `LEGALCOMPASS_API_KEY` | `dev-local-key` | Shared API key between backend and mapping API |
+| `LEGALCOMPASS_API_KEY` | *(required)* | The shared public API key: required on every `/api/*` call, also used between backend and mapping API |
+| `NEXT_PUBLIC_LEGALCOMPASS_API_KEY` | *(required, frontend)* | Same value as above, in `web/.env.local` / Vercel, so the website sends it automatically |
+| `RATE_API` | `120` | Max `/api/*` requests per minute per IP (all endpoints together) |
 | `LLM_API_KEY` | *(optional)* | Key for xAI Grok (`xai-...`) or Groq (`gsk_...`) for plain-language summaries |
 | `LLM_MODEL` | *(auto-detected)* | Override default chat model |
 | `CORS_ORIGINS` | `http://localhost:3000` | Allowed origins for cross-origin requests |
@@ -219,7 +375,7 @@ To run the backend test suite:
 ```bash
 cd backend
 # Ensure Mapping API is running on port 8000
-LEGALCOMPASS_API_KEY=dev-local-key python -m pytest -v
+python -m pytest -v        # uses LEGALCOMPASS_API_KEY from backend/.env
 ```
 
 The test suite validates:
